@@ -1,0 +1,16 @@
+{
+  "name": "gossiphaus",
+  "version": "1.0.0",
+  "description": "Easy integration with the gossip inter-MUD communication protocol",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "dinchak@gmail.com",
+  "license": "ISC",
+  "dependencies": {
+    "debug": "^4.0.1",
+    "uuid": "^3.3.2",
+    "ws": "^6.0.0"
+  }
+}
