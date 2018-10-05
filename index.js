@@ -1,3 +1,10 @@
+/**
+ * Integration with the Gossip inter-MUD communication protocol.
+ * See {@link https://gossip.haus Gossip} for more information.
+ * {@link https://github.com/dinchak/node-gossiphaus Repository}
+ * @author Tom Dinchak <dinchak@gmail.com>
+ */
+
 const EventEmitter = require('events')
 
 const debug = require('debug')('gossiphaus')
@@ -16,13 +23,52 @@ let players = []
  */
 let games = []
 
+/**
+ * Websocket connection object
+ * @type {WebSocket}
+ */
 let conn
+
+/**
+ * Event emitter to handle responses
+ * @type {EventEmitter}
+ */
 let emitter
+
+/**
+ * Configuration object
+ * @type {Object}
+ */
 let config
+
+/**
+ * Default websocket URL
+ * @type {string}
+ */
 let url = 'wss://gossip.haus/socket'
-let isAlive = false
+
+/**
+ * True if the connection is up
+ * @type {boolean}
+ */
+let alive = false
+
+/**
+ * How long to wait/collect game statuses before resolving connect()
+ * @type {Number}
+ */
 let statusWait = 100
+
+/**
+ * Reconnect interval identifier
+ * @type {Number}
+ */
 let reconnectInterval
+
+/**
+ * Time between reconnect attempts
+ * @type {Number}
+ */
 let reconnectIntervalTime = 5 * 1000
 
 /**
@@ -81,7 +127,7 @@ function init(setConfig) {
  */
 function connect() {
   return new Promise((resolve, reject) => {
-    if (isAlive) {
+    if (alive) {
       reject(new Error('Attempted to reconnect with active connection, call .close() first'))
       return
     }
@@ -129,13 +175,13 @@ function connect() {
 
     conn.on('close', () => {
       debug('connection closed, will reconnect')
-      isAlive = false
+      alive = false
     })
 
     if (!reconnectInterval) {
       reconnectInterval = setInterval(async () => {
         try {
-          if (!isAlive) {
+          if (!alive) {
             debug('reconnecting')
             await connect()
           }
@@ -151,6 +197,7 @@ function connect() {
  * Closes the websocket connection
  */
 function close() {
+  alive = false
   conn.close()
   clearInterval(reconnectInterval)
 }
@@ -181,9 +228,8 @@ function send(event, payload, ref = true) {
       if (!err) {
         return
       }
-      isAlive = false
+      alive = false
       debug('error received, will reconnect')
-      debug(err.stack)
       connect()
       reject(err)
     })
@@ -198,27 +244,28 @@ function send(event, payload, ref = true) {
 async function messageHandler(msg) {
   if (msg.error) {
     throw new Error(msg.error)
-    // emitter.emit('error', new Error(msg.error))
-    return
   }
 
   if (msg.event == 'heartbeat') {
-    isAlive = true
+    alive = true
     send('heartbeat', {players}, false)
   }
 
   if (msg.event == 'authenticate') {
-    isAlive = true
+    alive = true
   }
 
   if (msg.event == 'restart') {
-    isAlive = false
     debug('restart received, closing connection')
-    conn.close()
+    close()
   }
 
   msg.payload = msg.payload || {}
   msg.ref = msg.ref || ''
+
+  if (msg.event == 'channels/broadcast') {
+    emitter.emit('broadcast', msg.payload)
+  }
 
   if (msg.event == 'players/status') {
     let game = games.find(g => g.game == msg.payload.game)
@@ -234,7 +281,7 @@ async function messageHandler(msg) {
     let game = games.find(g => g.game == msg.payload.game)
     if (!game) {
       game = await send('players/status', {game: msg.payload.game})
-      games.push(game)
+      games.push(game.payload)
       return
     }
     game.players.push(msg.payload.name)
@@ -244,7 +291,7 @@ async function messageHandler(msg) {
     let game = games.find(g => g.game == msg.payload.game)
     if (!game) {
       game = await send('players/status', {game: msg.payload.game})
-      games.push(game)
+      games.push(game.payload)
       return
     }
     game.players = game.players.filter(n => n != msg.payload.name)
@@ -257,6 +304,7 @@ async function messageHandler(msg) {
  * Add a player and announce it to the gossip network.
  * 
  * @param {string} name The player name
+ * @returns {Promise} Resolves when the user is registered on gossip
  */
 function addPlayer(name) {
   if (!players.includes(name)) {
@@ -269,10 +317,21 @@ function addPlayer(name) {
  * Remove a player and announce it to the gossip network.
  * 
  * @param {string} name The player name
+ * @returns {Promise} Resolves when the user is removed from gossip
  */
 function removePlayer(name) {
   players = players.filter(n => n != name)
   return send('players/sign-out', {name})
 }
 
-module.exports = {init, connect, close, send, games, addPlayer, removePlayer}
+/**
+ * True if the connection to gossip is open and authenticated.
+ * @returns {boolean} true if the connection to gossip is available
+ */
+function isAlive() {
+  return alive
+}
+
+module.exports = {
+  init, connect, close, send, games, isAlive, addPlayer, removePlayer
+}
