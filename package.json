@@ -1,17 +1,18 @@
 {
   "name": "gossiphaus",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Easy integration with the gossip inter-MUD communication protocol",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "dinchak@gmail.com",
-  "license": "ISC",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/dinchak/node-gossiphaus.git"
   },
+  "keywords": ["gossip", "mud", "multi user dungeon", "moo", "muck", "game"],
   "dependencies": {
     "debug": "^4.0.1",
     "uuid": "^3.3.2",
