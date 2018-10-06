@@ -1,6 +1,6 @@
 {
   "name": "gossiphaus",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "Easy integration with the gossip inter-MUD communication protocol",
   "main": "index.js",
   "scripts": {
