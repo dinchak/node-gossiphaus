@@ -112,25 +112,25 @@ Initializes gossiphaus configuration.  Returns an event emitter object that will
 * `config.version` {string} API version number to use, default not set
 * `config.user_agent` {string} Game user agent, default not set
 
-### gossiphaus.connect()
+### async gossiphaus.connect()
 Connects to gossip, authenticates, and gets the status of current remotely connected games.  Returns a promise that resolves after `config.statusWait`.  The delay allows remote game status to accumulate and be available when the promise resolves.
 
-### gossiphaus.close()
-Closes the connection with gossip.  Connection can be re-established with `gossiphaus.connect()`.
+### async gossiphaus.close()
+Closes the connection with gossip.  Sends sign-off messages for each locally connected player gossiphaus knows about.  Connection can be re-established with `gossiphaus.connect()`.
 
-### gossiphaus.send(event, payload, ref = true)
+### async gossiphaus.send(event, payload, ref = true)
 Sends an event to gossip.  See [the documentation](https://gossip.haus/docs) for information on the messages that can be sent.  Returns a promise that resolves with the acknowledgement packet.
 
 * `event` {string} The gossip event name (**required**)
 * `payload` {Object} The gossip event payload object (**required**)
 * `ref` {boolean} If a ref id should be generated with this request, default: **true**
 
-### gossiphaus.addPlayer(name)
+### async gossiphaus.addPlayer(name)
 Adds a player to your local game and informs the gossip network.  This should be called when a user logs in to your game.  You should use this method instead of calling `send('players/sign-in')` directly so that `heartbeat` responses have an up-to-date player list.
 
 * `name` {string} The player's name (**required**)
 
-### gossiphaus.removePlayer(name)
+### async gossiphaus.removePlayer(name)
 Removes a player from your local game and informs the gossip network.  This should be called when a user logs out of your game.  You should use this method instead of calling `send('players/sign-out')` directly so that `heartbeat` responses have an up-to-date player list.
 
 * `name` {string} The player's name (**required**)
