@@ -331,6 +331,29 @@ function removePlayer(name) {
 }
 
 /**
+ * Validates that a player-entered remote identifier is logged in and
+ * returns an object representing that remote player with proper
+ * capitalization.
+ * @param {string} remoteName A player-entered remote player identifier
+ * @returns {Object} An object representing the remote player
+ */
+function findPlayer(remoteName) {
+  let [playerName, gameName] = remoteName.split('@')
+
+  let game = games.find(g => g.game.toLowerCase() == gameName.toLowerCase())
+  if (!game) {
+    return false
+  }
+
+  let name = game.players.find(n => n.toLowerCase() == playerName.toLowerCase())
+  if (!name) {
+    return false
+  }
+
+  return {game, name}
+}
+
+/**
  * True if the connection to gossip is open and authenticated.
  * @returns {boolean} true if the connection to gossip is available
  */
@@ -339,5 +362,5 @@ function isAlive() {
 }
 
 module.exports = {
-  init, connect, close, send, games, isAlive, addPlayer, removePlayer
+  init, connect, close, send, games, isAlive, addPlayer, removePlayer, findPlayer
 }

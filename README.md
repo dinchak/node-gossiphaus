@@ -66,6 +66,10 @@ async function run() {
       channel: 'secrets'
     })
 
+    // returns {name: 'SomeOtherPlayer', game: 'SomeGame'} if that remote
+    // player identifier is currently signed in on the remote game
+    result = gossip.findPlayer('someotherplayer@somegame')
+
     // send a tell to a remote user
     result = await gossip.send('tells/send', {
       from_name: 'SomePlayer',
@@ -130,6 +134,12 @@ Adds a player to your local game and informs the gossip network.  This should be
 Removes a player from your local game and informs the gossip network.  This should be called when a user logs out of your game.  You should use this method instead of calling `send('players/sign-out')` directly so that `heartbeat` responses have an up-to-date player list.
 
 * `name` {string} The player's name (**required**)
+
+### gossiphaus.findPlayer(rpi)
+Verifies that a remote player identifier (ie. someplayer@somegame) is logged in.  Case-insensitive
+but returns the proper capitalization.  Useful when targeting remote players (ie. a remote tell command).  Returns an object of the form {name: 'SomePlayer', game: 'SomeGame'}.
+
+* `rpi` {string} The remote player identifier, ie. someplayer@somegame (**required**)
 
 ### gossiphaus.isAlive()
 Returns `true` if we are connected and authenticated to gossip and ready to send messages.

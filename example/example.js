@@ -53,11 +53,15 @@ async function run() {
       channel: 'secrets'
     })
 
+    // returns {name: 'SomeOtherPlayer', game: 'SomeGame'} if the given
+    // remote player identifier is currently signed in
+    result = gossip.findPlayer('someotherplayer@somegame')
+
     // send a tell to a remote user
     result = await gossip.send('tells/send', {
       from_name: 'SomePlayer',
-      to_game: 'SomeGame',
-      to_name: 'SomeOtherPlayer',
+      to_game: 'SomeGame', // or result.name from above
+      to_name: 'SomeOtherPlayer', // or result.game from above
       sent_at: new Date(),
       message: 'test'
     })
