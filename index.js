@@ -293,7 +293,9 @@ async function messageHandler(msg) {
       games.push(game.payload)
       return
     }
-    game.players.push(msg.payload.name)
+    if (!game.players.includes(msg.payload.name)) {
+      game.players.push(msg.payload.name)
+    }
   }
 
   if (msg.event == 'players/sign-out' && msg.payload.game) {
