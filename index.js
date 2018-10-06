@@ -288,71 +288,70 @@ async function messageHandler(msg) {
         game.players = game.players.filter(name => name != payload.to_name)
       }
     }
-  } else {
-    msg.payload = msg.payload || {}
-    msg.ref = msg.ref || ''
 
-    if (msg.event == 'heartbeat') {
-      alive = true
-      await send('heartbeat', {players}, false)
+    emitter.emit(`${msg.event}:${msg.ref}`, msg)
+    throw new Error(msg.error)
+  }
+
+  msg.payload = msg.payload || {}
+  msg.ref = msg.ref || ''
+
+  if (msg.event == 'heartbeat') {
+    alive = true
+    await send('heartbeat', {players}, false)
+  }
+
+  if (msg.event == 'authenticate') {
+    alive = true
+  }
+
+  if (msg.event == 'restart') {
+    debug('restart received, closing connection')
+    await close()
+    reconnect()
+  }
+
+  if (msg.event == 'channels/broadcast') {
+    emitter.emit(msg.event, msg.payload)
+  }
+
+  if (msg.event == 'tells/receive') {
+    emitter.emit(msg.event, msg.payload)
+  }
+
+  if (msg.event == 'players/status') {
+    let game = games.find(g => g.game == msg.payload.game)
+    if (game) {
+      game.players = msg.payload.players
+      game.supports = msg.payload.supports
+    } else {
+      games.push(msg.payload)
     }
+  }
 
-    if (msg.event == 'authenticate') {
-      alive = true
+  if (msg.event == 'players/sign-in' && msg.payload.game) {
+    let game = games.find(g => g.game == msg.payload.game)
+    if (!game) {
+      await send('players/status', {game: msg.payload.game})
+      game = games.find(g => g.game == msg.payload.game)
     }
-
-    if (msg.event == 'restart') {
-      debug('restart received, closing connection')
-      await close()
-      reconnect()
+    if (game && !game.players.includes(msg.payload.name)) {
+      game.players.push(msg.payload.name)
     }
+  }
 
-    if (msg.event == 'channels/broadcast') {
-      emitter.emit(msg.event, msg.payload)
+  if (msg.event == 'players/sign-out' && msg.payload.game) {
+    let game = games.find(g => g.game == msg.payload.game)
+    if (!game) {
+      await send('players/status', {game: msg.payload.game})
+      game = games.find(g => g.game == msg.payload.game)
     }
-
-    if (msg.event == 'tells/receive') {
-      emitter.emit(msg.event, msg.payload)
-    }
-
-    if (msg.event == 'players/status') {
-      let game = games.find(g => g.game == msg.payload.game)
-      if (game) {
-        game.players = msg.payload.players
-        game.supports = msg.payload.supports
-      } else {
-        games.push(msg.payload)
-      }
-    }
-
-    if (msg.event == 'players/sign-in' && msg.payload.game) {
-      let game = games.find(g => g.game == msg.payload.game)
-      if (!game) {
-        let response = await send('players/status', {game: msg.payload.game})
-        game = response.payload
-        games.push(game)
-      }
-      if (!game.players.includes(msg.payload.name)) {
-        game.players.push(msg.payload.name)
-      }
-    }
-
-    if (msg.event == 'players/sign-out' && msg.payload.game) {
-      let game = games.find(g => g.game == msg.payload.game)
-      if (!game) {
-        let response = await send('players/status', {game: msg.payload.game})
-        game = response.payload
-        games.push(game)
-      }
+    if (game && game.players.includes(msg.payload.name)) {
       game.players = game.players.filter(n => n != msg.payload.name)
     }
   }
 
   emitter.emit(`${msg.event}:${msg.ref}`, msg)
-
-  if (msg.error) {
-    throw new Error(msg.error)
-  }
 }
 
 /**
