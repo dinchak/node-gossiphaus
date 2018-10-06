@@ -16,6 +16,16 @@ async function run() {
       console.log(err.stack)
     })
 
+    // handle channel broadcasts
+    emitter.on('channels/broadcast', (payload) => {
+      console.log(payload)
+    })
+
+    // handle tells
+    emitter.on('tells/receive', (payload) => {
+      console.log(payload)
+    })
+
     // connect to gossip and retrieve current game status
     await gossip.connect()
 

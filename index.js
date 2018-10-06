@@ -220,7 +220,9 @@ function send(event, payload, ref = true) {
       packet.ref = uuid()
     }
 
-    emitter.once(`${event}:${packet.ref || ''}`, resolve)
+    let key = `${event}:${packet.ref || ''}`
+    emitter.removeAllListeners(key)
+    emitter.once(key, resolve)
 
     let json = JSON.stringify(packet)
     debug('send: ' + json) 
@@ -248,7 +250,7 @@ async function messageHandler(msg) {
 
   if (msg.event == 'heartbeat') {
     alive = true
-    send('heartbeat', {players}, false)
+    await send('heartbeat', {players}, false)
   }
 
   if (msg.event == 'authenticate') {
@@ -264,7 +266,11 @@ async function messageHandler(msg) {
   msg.ref = msg.ref || ''
 
   if (msg.event == 'channels/broadcast') {
-    emitter.emit('broadcast', msg.payload)
+    emitter.emit(msg.event, msg.payload)
+  }
+
+  if (msg.event == 'tells/receive') {
+    emitter.emit(msg.event, msg.payload)
   }
 
   if (msg.event == 'players/status') {
