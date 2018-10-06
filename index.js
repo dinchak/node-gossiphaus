@@ -245,7 +245,13 @@ function send(event, payload, ref = true) {
 
     let key = `${event}:${packet.ref || ''}`
     emitter.removeAllListeners(key)
-    emitter.once(key, resolve)
+    emitter.once(key, (msg) => {
+      if (msg.error) {
+        reject(new Error(msg.error))
+        return
+      }
+      resolve(msg)
+    })
 
     let json = JSON.stringify(packet)
     debug('send: ' + json) 
@@ -278,7 +284,7 @@ async function messageHandler(msg) {
     if (msg.event == 'tells/send' && msg.error == 'game offline') {
       if (games.find(g => g.game == payload.to_game)) {
         debug(`${payload.to_game} is offline, removing from games list`)
-        games = games.filter(g => g.game != payload.to_game)
+        module.exports.games = games = games.filter(g => g.game != payload.to_game)
       }
     }
     if (msg.event == 'tells/send' && msg.error == 'player offline') {
@@ -410,5 +416,5 @@ function isAlive() {
 }
 
 module.exports = {
-  init, connect, close, send, games, isAlive, addPlayer, removePlayer, findPlayer
+  init, connect, close, send, isAlive, addPlayer, removePlayer, findPlayer, games
 }
