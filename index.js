@@ -72,6 +72,12 @@ let reconnectInterval
 let reconnectIntervalTime = 5 * 1000
 
 /**
+ * Ref to payload cache for associating responses with the original request payloads
+ * @type {Object}
+ */
+let refs = {}
+
+/**
  * Initialize the gossip connection.  client_id and client_secret are required, but the
  * rest have defaults.  Configuration options are as follows:
  *   
@@ -128,7 +134,7 @@ function init(setConfig) {
 function connect() {
   return new Promise((resolve, reject) => {
     if (alive) {
-      reject(new Error('Attempted to reconnect with active connection, call .close() first'))
+      reject(new Error('Attempted to connect() with active connection, call .close() first'))
       return
     }
 
@@ -168,41 +174,54 @@ function connect() {
         let data = JSON.parse(json)
         await messageHandler(data)
       } catch (err) {
-        reject(err)
-        // emitter.emit('error', err)
+        emitter.emit('error', err)
       }
     })
 
     conn.on('close', () => {
       debug('connection closed, will reconnect')
       alive = false
+      reconnect()
     })
-
-    if (!reconnectInterval) {
-      reconnectInterval = setInterval(async () => {
-        try {
-          if (!alive) {
-            debug('reconnecting')
-            await connect()
-          }
-        } catch (err) {
-          emitter.emit('error', err)
-        }
-      }, reconnectIntervalTime)
-    }
   })
+}
+
+/**
+ * Start reconnect attempts on an interval.
+ */
+function reconnect() {
+  if (reconnectInterval) {
+    clearInterval(reconnectInterval)
+  }
+
+  reconnectInterval = setInterval(async () => {
+    try {
+      if (alive) {
+        debug('reconnect failed, connection is already alive')
+        clearInterval(reconnectInterval)
+        return
+      }
+      debug('reconnecting')
+      await connect()
+    } catch (err) {
+      emitter.emit('error', err)
+    }
+  }, reconnectIntervalTime)
 }
 
 /**
  * Closes the websocket connection
  */
 async function close() {
-  for (let name of players) {
-    await send('players/sign-out', {name})
+  try {
+    for (let name of players) {
+      await send('players/sign-out', {name})
+    }
+    alive = false
+    conn.close()
+  } catch (err) {
+    emitter.emit(err)
   }
-  alive = false
-  conn.close()
-  clearInterval(reconnectInterval)
 }
 
 /**
@@ -221,6 +240,7 @@ function send(event, payload, ref = true) {
 
     if (ref) {
       packet.ref = uuid()
+      refs[packet.ref] = payload
     }
 
     let key = `${event}:${packet.ref || ''}`
@@ -229,13 +249,13 @@ function send(event, payload, ref = true) {
 
     let json = JSON.stringify(packet)
     debug('send: ' + json) 
-    conn.send(json, (err) => {
+    conn.send(json, async (err) => {
       if (!err) {
         return
       }
-      alive = false
       debug('error received, will reconnect')
-      connect()
+      await close()
+      reconnect()
       reject(err)
     })
   })
@@ -247,68 +267,92 @@ function send(event, payload, ref = true) {
  * @param {Object} msg {event, payload, ref, status, error}
  */
 async function messageHandler(msg) {
+  let payload = {}
+
+  if (msg.ref) {
+    payload = refs[msg.ref]
+    delete refs[msg.ref]
+  }
+
   if (msg.error) {
-    throw new Error(msg.error)
-  }
-
-  if (msg.event == 'heartbeat') {
-    alive = true
-    await send('heartbeat', {players}, false)
-  }
-
-  if (msg.event == 'authenticate') {
-    alive = true
-  }
-
-  if (msg.event == 'restart') {
-    debug('restart received, closing connection')
-    await close()
-  }
-
-  msg.payload = msg.payload || {}
-  msg.ref = msg.ref || ''
-
-  if (msg.event == 'channels/broadcast') {
-    emitter.emit(msg.event, msg.payload)
-  }
-
-  if (msg.event == 'tells/receive') {
-    emitter.emit(msg.event, msg.payload)
-  }
-
-  if (msg.event == 'players/status') {
-    let game = games.find(g => g.game == msg.payload.game)
-    if (game) {
-      game.players = msg.payload.players
-      game.supports = msg.payload.supports
-    } else {
-      games.push(msg.payload)
+    if (msg.event == 'tells/send' && msg.error == 'game offline') {
+      if (games.find(g => g.game == payload.to_game)) {
+        debug(`${payload.to_game} is offline, removing from games list`)
+        games = games.filter(g => g.game != payload.to_game)
+      }
     }
-  }
+    if (msg.event == 'tells/send' && msg.error == 'player offline') {
+      let game = games.find(g => g.name == payload.to_game)
+      if (game && game.players.find(name => name == payload.to_name)) {
+        debug(`${payload.to_name} is offline, removing from players list`)      
+        game.players = game.players.filter(name => name != payload.to_name)
+      }
+    }
+  } else {
+    msg.payload = msg.payload || {}
+    msg.ref = msg.ref || ''
 
-  if (msg.event == 'players/sign-in' && msg.payload.game) {
-    let game = games.find(g => g.game == msg.payload.game)
-    if (!game) {
-      game = await send('players/status', {game: msg.payload.game})
-      games.push(game.payload)
-      return
+    if (msg.event == 'heartbeat') {
+      alive = true
+      await send('heartbeat', {players}, false)
     }
-    if (!game.players.includes(msg.payload.name)) {
-      game.players.push(msg.payload.name)
-    }
-  }
 
-  if (msg.event == 'players/sign-out' && msg.payload.game) {
-    let game = games.find(g => g.game == msg.payload.game)
-    if (!game) {
-      game = await send('players/status', {game: msg.payload.game})
-      games.push(game.payload)
-      return
+    if (msg.event == 'authenticate') {
+      alive = true
     }
-    game.players = game.players.filter(n => n != msg.payload.name)
+
+    if (msg.event == 'restart') {
+      debug('restart received, closing connection')
+      await close()
+      reconnect()
+    }
+
+    if (msg.event == 'channels/broadcast') {
+      emitter.emit(msg.event, msg.payload)
+    }
+
+    if (msg.event == 'tells/receive') {
+      emitter.emit(msg.event, msg.payload)
+    }
+
+    if (msg.event == 'players/status') {
+      let game = games.find(g => g.game == msg.payload.game)
+      if (game) {
+        game.players = msg.payload.players
+        game.supports = msg.payload.supports
+      } else {
+        games.push(msg.payload)
+      }
+    }
+
+    if (msg.event == 'players/sign-in' && msg.payload.game) {
+      let game = games.find(g => g.game == msg.payload.game)
+      if (!game) {
+        let response = await send('players/status', {game: msg.payload.game})
+        game = response.payload
+        games.push(game)
+      }
+      if (!game.players.includes(msg.payload.name)) {
+        game.players.push(msg.payload.name)
+      }
+    }
+
+    if (msg.event == 'players/sign-out' && msg.payload.game) {
+      let game = games.find(g => g.game == msg.payload.game)
+      if (!game) {
+        let response = await send('players/status', {game: msg.payload.game})
+        game = response.payload
+        games.push(game)
+      }
+      game.players = game.players.filter(n => n != msg.payload.name)
+    }
   }
 
   emitter.emit(`${msg.event}:${msg.ref}`, msg)
+
+  if (msg.error) {
+    throw new Error(msg.error)
+  }
 }
 
 /**
