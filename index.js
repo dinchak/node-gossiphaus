@@ -196,7 +196,10 @@ function connect() {
 /**
  * Closes the websocket connection
  */
-function close() {
+async function close() {
+  for (let name of players) {
+    await send('players/sign-out', {name})
+  }
   alive = false
   conn.close()
   clearInterval(reconnectInterval)
@@ -259,7 +262,7 @@ async function messageHandler(msg) {
 
   if (msg.event == 'restart') {
     debug('restart received, closing connection')
-    close()
+    await close()
   }
 
   msg.payload = msg.payload || {}
@@ -350,7 +353,7 @@ function findPlayer(remoteName) {
     return false
   }
 
-  return {game, name}
+  return {game: game.game, name}
 }
 
 /**
