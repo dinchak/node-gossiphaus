@@ -160,6 +160,7 @@ function connect() {
           resolve()
         }, statusWait)
       } catch (err) {
+        scheduleReconnect(5)
         reject(err)
       }
     })
@@ -179,6 +180,12 @@ function connect() {
       alive = false
       scheduleReconnect(5)
     })
+
+    conn.on('error', () => {
+      debug('connection error, will reconnect')
+      alive = false
+      scheduleReconnect(5)
+    })
   })
 }
 
@@ -194,12 +201,9 @@ function scheduleReconnect(seconds) {
 
   reconnectInterval = setTimeout(async () => {
     try {
-      if (alive) {
-        debug('reconnect failed, connection is already alive')
-        scheduleReconnect(seconds)
-        return
-      }
       debug('reconnecting')
+      alive = false
+      conn.close()
       await connect()
     } catch (err) {
       emitter.emit('error', err)
