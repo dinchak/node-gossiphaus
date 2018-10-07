@@ -66,12 +66,6 @@ let statusWait = 100
 let reconnectInterval
 
 /**
- * Time between reconnect attempts
- * @type {Number}
- */
-let reconnectIntervalTime = 5 * 1000
-
-/**
  * Ref to payload cache for associating responses with the original request payloads
  * @type {Object}
  */
@@ -160,6 +154,8 @@ function connect() {
         await send('authenticate', payload, false)
         await send('players/status')
 
+        scheduleReconnect(20)
+
         setTimeout(() => {
           resolve()
         }, statusWait)
@@ -181,24 +177,26 @@ function connect() {
     conn.on('close', () => {
       debug('connection closed, will reconnect')
       alive = false
-      reconnect()
+      scheduleReconnect(5)
     })
   })
 }
 
 /**
- * Start reconnect attempts on an interval.
+ * Schedule a reconnect attempt.  Receiving a heartbeat message will reset
+ * the timer.
  */
-function reconnect() {
+function scheduleReconnect(seconds) {
+  debug('will reconnect in ' + seconds + ' seconds')
   if (reconnectInterval) {
-    clearInterval(reconnectInterval)
+    clearTimeout(reconnectInterval)
   }
 
-  reconnectInterval = setInterval(async () => {
+  reconnectInterval = setTimeout(async () => {
     try {
       if (alive) {
         debug('reconnect failed, connection is already alive')
-        clearInterval(reconnectInterval)
+        scheduleReconnect(seconds)
         return
       }
       debug('reconnecting')
@@ -206,7 +204,7 @@ function reconnect() {
     } catch (err) {
       emitter.emit('error', err)
     }
-  }, reconnectIntervalTime)
+  }, seconds * 1000)
 }
 
 /**
@@ -261,7 +259,7 @@ function send(event, payload, ref = true) {
       }
       debug('error received, will reconnect')
       await close()
-      reconnect()
+      scheduleReconnect(5)
       reject(err)
     })
   })
@@ -304,6 +302,7 @@ async function messageHandler(msg) {
 
   if (msg.event == 'heartbeat') {
     alive = true
+    scheduleReconnect(20)
     await send('heartbeat', {players}, false)
   }
 
@@ -314,7 +313,7 @@ async function messageHandler(msg) {
   if (msg.event == 'restart') {
     debug('restart received, closing connection')
     await close()
-    reconnect()
+    scheduleReconnect(5)
   }
 
   if (msg.event == 'channels/broadcast') {

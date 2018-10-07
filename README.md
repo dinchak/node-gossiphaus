@@ -105,7 +105,6 @@ Initializes gossiphaus configuration.  Returns an event emitter object that will
 * `config.client_id` {string} Your game's gossip client_id (**required**)
 * `config.client_secret` {string} Your game's gossip client_secret (**required**)
 * `config.statusWait` {Number} How long to wait and collect status messages on connect before resolving (in ms), default: **100**
-* `config.reconnectIntervalTime` {Number} How long to wait in between reconnection attempts (in ms), default: **5000**
 * `config.url` {string} gossip websocket url, default: **wss://gossip.haus/socket**
 * `config.supports` {Array.<string>} Supported methods, default: **['channels', 'players', 'tells']**
 * `config.channels` {Array.<string>} Channels to subscribe to, default: **['testing', 'gossip']**
