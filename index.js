@@ -1,7 +1,10 @@
 /**
  * Integration with the Gossip inter-MUD communication protocol.
+ * 
  * See {@link https://gossip.haus Gossip} for more information.
+ *
  * {@link https://github.com/dinchak/node-gossiphaus Repository}
+ * 
  * @author Tom Dinchak <dinchak@gmail.com>
  */
 
@@ -147,11 +150,12 @@ function connect() {
         debug('websocket connection opened to ' + url)
 
         let payload = Object.assign({
-          supports: ['channels', 'players', 'tells'],
+          supports: ['channels', 'players', 'tells', 'games'],
           channels: ['testing', 'gossip']
         }, config)
 
         await send('authenticate', payload, false)
+        await send('games/status')
         await send('players/status')
 
         scheduleReconnect(20)
@@ -331,27 +335,46 @@ async function messageHandler(msg) {
   if (msg.event == 'players/status') {
     let game = games.find(g => g.game == msg.payload.game)
     if (game) {
-      game.players = msg.payload.players
-      game.supports = msg.payload.supports
+      for (let key in msg.payload) {
+        game[key] = msg.payload[key]
+      }
     } else {
       games.push(msg.payload)
+    }
+  }
+
+  if (msg.event == 'games/status') {
+    let game = games.find(g => g.game == msg.payload.game)
+    if (!game) {
+      games.push(msg.payload)
+    } else {
+      for (let key in msg.payload) {
+        game[key] = msg.payload[key]
+      }
     }
   }
 
   if (msg.event == 'players/sign-in' && msg.payload.game) {
     let game = games.find(g => g.game == msg.payload.game)
     if (!game) {
+      await send('games/status', {game: msg.payload.game})
       await send('players/status', {game: msg.payload.game})
       game = games.find(g => g.game == msg.payload.game)
     }
-    if (game && !game.players.includes(msg.payload.name)) {
-      game.players.push(msg.payload.name)
+    if (game) {
+      if (!game.players) {
+        game.players = []
+      }
+      if (!game.players.includes(msg.payload.name)) {
+        game.players.push(msg.payload.name)
+      }
     }
   }
 
   if (msg.event == 'players/sign-out' && msg.payload.game) {
     let game = games.find(g => g.game == msg.payload.game)
     if (!game) {
+      await send('games/status', {game: msg.payload.game})
       await send('players/status', {game: msg.payload.game})
       game = games.find(g => g.game == msg.payload.game)
     }
