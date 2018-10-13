@@ -288,9 +288,10 @@ async function messageHandler(msg) {
 
   if (msg.error) {
     if (msg.event == 'tells/send' && msg.error == 'game offline') {
-      if (games.find(g => g.game == payload.to_game)) {
-        debug(`${payload.to_game} is offline, removing from games list`)
-        module.exports.games = games = games.filter(g => g.game != payload.to_game)
+      let game = games.find(g => g.game == payload.to_game)
+      if (game) {
+        debug(`${payload.to_game} is offline, marking as disconnected`)
+        game.connected = false
       }
     }
     if (msg.event == 'tells/send' && msg.error == 'player offline') {
@@ -332,17 +333,6 @@ async function messageHandler(msg) {
     emitter.emit(msg.event, msg.payload)
   }
 
-  if (msg.event == 'players/status') {
-    let game = games.find(g => g.game == msg.payload.game)
-    if (game) {
-      for (let key in msg.payload) {
-        game[key] = msg.payload[key]
-      }
-    } else {
-      games.push(msg.payload)
-    }
-  }
-
   if (msg.event == 'games/status') {
     let game = games.find(g => g.game == msg.payload.game)
     if (!game) {
@@ -351,6 +341,41 @@ async function messageHandler(msg) {
       for (let key in msg.payload) {
         game[key] = msg.payload[key]
       }
+    }
+  }
+
+  if (msg.event == 'games/connect') {
+    let game = games.find(g => g.game == msg.payload.game)
+    if (!game) {
+      await send('games/status', {game: msg.payload.game})
+    }
+    game = games.find(g => g.game == msg.payload.game)
+    if (game) {
+      game.connected = true
+    }
+    console.log(game)
+  }
+
+  if (msg.event == 'games/disconnect') {
+    let game = games.find(g => g.game == msg.payload.game)
+    if (!game) {
+      await send('games/status', {game: msg.payload.game})
+    }
+    game = games.find(g => g.game == msg.payload.game)
+    if (game) {
+      game.connected = false
+    }
+    console.log(game)
+  }
+
+  if (msg.event == 'players/status') {
+    let game = games.find(g => g.game == msg.payload.game)
+    if (game) {
+      for (let key in msg.payload) {
+        game[key] = msg.payload[key]
+      }
+    } else {
+      games.push(msg.payload)
     }
   }
 
