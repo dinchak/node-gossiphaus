@@ -336,7 +336,7 @@ async function messageHandler(msg) {
   if (msg.event == 'games/status') {
     let game = games.find(g => g.game == msg.payload.game)
     if (!game) {
-      games.push(msg.payload)
+      games.push(Object.assign({connected: true}, msg.payload))
     } else {
       for (let key in msg.payload) {
         game[key] = msg.payload[key]
