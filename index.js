@@ -294,6 +294,13 @@ async function messageHandler(msg) {
         game.connected = false
       }
     }
+    if (msg.event == 'games/status' && msg.error == 'unknown game') {
+      let game = games.find(g => g.game == payload.to_game)
+      if (game) {
+        debug(`${payload.to_game} is offline, marking as disconnected`)
+        game.connected = false
+      }
+    }
     if (msg.event == 'tells/send' && msg.error == 'player offline') {
       let game = games.find(g => g.name == payload.to_game)
       if (game && game.players.find(name => name == payload.to_name)) {
