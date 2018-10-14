@@ -353,7 +353,6 @@ async function messageHandler(msg) {
     if (game) {
       game.connected = true
     }
-    console.log(game)
   }
 
   if (msg.event == 'games/disconnect') {
@@ -365,7 +364,6 @@ async function messageHandler(msg) {
     if (game) {
       game.connected = false
     }
-    console.log(game)
   }
 
   if (msg.event == 'players/status') {
