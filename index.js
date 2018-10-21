@@ -220,9 +220,6 @@ function scheduleReconnect(seconds) {
  */
 async function close() {
   try {
-    for (let name of players) {
-      await send('players/sign-out', {name})
-    }
     alive = false
     conn.close()
   } catch (err) {
